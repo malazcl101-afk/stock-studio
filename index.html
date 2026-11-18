@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Studio — Adobe Stock Batch Maker</title>
+<meta name="theme-color" content="#0b2a4a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{--navy:#0b2a4a;--teal:#0e7c7b;--bg:#f4f6f8;--card:#fff;--mut:#5b6b7a;--ok:#1a7f37;--bad:#b3261e;--warn:#9a6700}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#12212f}
+  header{background:var(--navy);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:19px}
+  header p{margin:2px 0 0;font-size:12.5px;opacity:.85}
+  main{max-width:860px;margin:0 auto;padding:14px}
+  .card{background:var(--card);border:1px solid #dde4ea;border-radius:12px;padding:14px;margin-bottom:14px}
+  .card h2{margin:0 0 8px;font-size:15.5px}
+  label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
+  input[type=password],input[type=text],select{width:100%;padding:10px;border:1px solid #c3ced8;border-radius:8px;font-size:14px;background:#fff}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:150px}
+  button{background:var(--teal);color:#fff;border:0;border-radius:9px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.ghost{background:#e8eef3;color:var(--navy)}
+  button.danger{background:var(--bad)}
+  .small{font-size:12.5px;color:var(--mut)}
+  .themes{font-size:13.5px;line-height:1.5}
+  .themes b{color:var(--navy)}
+  progress{width:100%;height:14px}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:10px}
+  #grid figure{margin:0;border:1px solid #dde4ea;border-radius:8px;overflow:hidden;background:#fff}
+  #grid img{width:100%;height:70px;object-fit:cover;display:block;background:#e8eef3}
+  #grid figcaption{font-size:10.5px;padding:4px 6px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .st-ok{color:var(--ok);font-weight:700}.st-bad{color:var(--bad);font-weight:700}.st-run{color:var(--warn);font-weight:700}
+  #log{background:#0d1b29;color:#cfe3f5;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;border-radius:10px;padding:10px 12px;max-height:220px;overflow:auto;white-space:pre-wrap}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  details summary{cursor:pointer;font-weight:600;font-size:14px}
+  .hist{font-size:12.5px;color:var(--mut);max-height:130px;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>📸 Stock Studio</h1>
+  <p>One tap → seasonal Adobe Stock batch: images + metadata CSV in a single ZIP.</p>
+</header>
+<main>
+
+  <div class="card">
+    <h2>1 · Gemini API key</h2>
+    <label for="apikey">API key (free, from Google AI Studio — stored only on this device)</label>
+    <input type="password" id="apikey" placeholder="Paste your AI Studio API key here" autocomplete="off">
+    <p class="small">Get it free: open <b>aistudio.google.com</b> → sign in with <b>smuzammil125@gmail.com</b> (your Gemini Pro account) → “Get API key” → “Create API key”. The key never leaves your device except to call Google.</p>
+  </div>
+
+  <div class="card">
+    <h2>2 · Today’s batch (AUTO)</h2>
+    <p class="themes" id="autoplan">…</p>
+    <div class="row">
+      <div>
+        <label for="count">Images</label>
+        <select id="count">
+          <option value="10">10 (quick test)</option>
+          <option value="25">25</option>
+          <option value="50" selected>50 (full day)</option>
+        </select>
+      </div>
+      <div>
+        <label for="override">Theme</label>
+        <select id="override"><option value="">AUTO — by season</option></select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button id="go">▶ Generate batch</button>
+      <button id="stop" class="danger" disabled>■ Stop</button>
+    </div>
+    <p class="small" style="margin-top:10px">Keep this tab open while it works. If Google’s free limit stops the run, the ZIP still contains everything finished — just run again later for the rest.</p>
+    <progress id="bar" value="0" max="100" style="display:none"></progress>
+    <p id="status" class="small"></p>
+    <div id="grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Get the files</h2>
+    <div class="btnrow" style="margin-top:0">
+      <button id="zip" disabled>⬇ Download ZIP (images + CSV)</button>
+      <button id="copycsv" class="ghost" disabled>Copy CSV only</button>
+    </div>
+    <p class="small">Send the ZIP to Muse — he checks, upscales and uploads it to Adobe Stock in one wave.</p>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>Log &amp; history</summary>
+      <div id="log" style="margin-top:10px">Ready.</div>
+      <h3 style="font-size:13.5px;margin:14px 0 4px">Batches made on this device</h3>
+      <div class="hist" id="hist">None yet.</div>
+      <div class="btnrow"><button id="clearhist" class="ghost">Clear history</button></div>
+    </details>
+  </div>
+
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+/* ================= CONFIG ================= */
+const MODEL = "gemini-2.5-flash-image";
+const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
+const STYLE = " Photorealistic stock photo, wide 16:9 landscape composition. No people, no faces, no hands. No readable text, letters or numbers anywhere. No logos, no brand names, no watermarks. High detail, clean composition with copy space.";
+const VARIANTS = ["", " Shot at a slight three-quarter angle with soft window light.", " Top-down flat lay composition.", " Close-up detail framing.", " Warm evening light.", " Bright airy daylight.", " Shot with shallow depth of field and a softly blurred background."];
+const MONTH_THEMES = {1:["ramadan","spring","freshstart"],2:["spring","mothersday"],3:["spring","mothersday","summer"],4:["summer"],5:["summer"],6:["backtoschool"],7:["backtoschool","autumn"],8:["autumn","christmas"],9:["christmas"],10:["christmas","freshstart"],11:["freshstart","tax","winter"],12:["valentines","ramadan","tax","winter"]};
+const THEME_NAMES = {freshstart:"New Year / Fresh Start",valentines:"Valentine's Day",tax:"Tax & Business Finance",winter:"Winter / Cozy",ramadan:"Ramadan & Eid",spring:"Spring / Easter",mothersday:"Mother's Day",summer:"Summer Travel",backtoschool:"Back to School",autumn:"Autumn / Halloween",christmas:"Christmas"};
+const THEME_KW = {freshstart:"new year, fresh start, january, resolutions, goal setting, planning",valentines:"valentine's day, february, romance, love",tax:"tax season, finance, business, accounting",winter:"winter, cozy, cold season",ramadan:"ramadan, eid, islamic, celebration",spring:"spring, easter, renewal, blossom",mothersday:"mother's day, may, appreciation, gift",summer:"summer, travel, vacation, holiday",backtoschool:"back to school, education, september",autumn:"autumn, fall, halloween, october",christmas:"christmas, december, holiday season, festive"};
+
+/* ============ SCENE BANKS: [slug, image scene, title, keywords, category] ============ */
+const BANKS = {
+freshstart:[
+["blank-planner-desk","A blank open planner and a blank wall calendar on a tidy light wood desk with a pen and a cup of coffee","Blank planner and calendar on a tidy desk for new year planning","planner, blank calendar, desk, organisation, pen, coffee, tidy, workspace","Work"],
+["fresh-notebook-desk","An open blank notebook on a clean minimal desk beside a small green plant and a glass of water","Open blank notebook on a clean minimal desk with a plant","blank notebook, minimal desk, plant, journal, writing, minimal, clean","Work"],
+["sunrise-tidy-desk","A tidy empty desk in front of a window at sunrise with soft golden light and a blank notebook","Tidy desk at sunrise with a blank notebook and golden light","sunrise, desk, morning, blank notebook, window, golden light, calm","Work"],
+["blank-vision-board","A blank cork vision board with blank cards and blank sticky notes pinned on it above a desk","Blank vision board with blank cards above a desk","vision board, cork board, blank cards, sticky notes, goals, desk, planning","Work"],
+["neat-minimal-shelves","Neat minimal white shelves with blank storage boxes, small plants and folded linens","Neat minimal shelves with blank storage boxes and plants","shelves, minimal, storage boxes, organised, plants, declutter, home","Buildings and Architecture"],
+["running-shoes-morning","A pair of running shoes and a water bottle on a path at dawn with soft morning mist","Running shoes on a path at dawn with morning mist","running shoes, dawn, path, fitness, morning, exercise, mist","Sports"],
+["yoga-mat-window","A rolled yoga mat and a small dumbbell set beside a bright window with morning light","Yoga mat and dumbbells beside a bright window","yoga mat, dumbbells, window, morning, home workout, wellness, light","Sports"],
+["home-gym-corner","A tidy home gym corner with dumbbells, a kettlebell, a resistance band and a foam roller on a mat","Tidy home gym corner with dumbbells and a kettlebell","home gym, dumbbells, kettlebell, workout, mat, fitness corner, equipment","Sports"],
+["healthy-breakfast-flatlay","A healthy breakfast flat lay with oats, berries, nuts, yogurt and a glass of green smoothie on a light table","Healthy breakfast flat lay with berries oats and a green smoothie","breakfast, healthy eating, berries, oats, smoothie, flat lay, nutrition","Food"],
+["goal-planning-flatlay","A planning flat lay with a blank notebook, blank sticky notes, a pen, reading glasses and a laptop edge","Planning flat lay with a blank notebook and sticky notes","flat lay, blank notebook, sticky notes, pen, planning, desk, goals","Work"],
+["morning-journal-cafe","A blank journal and a cup of tea on a small cafe table by a window in the morning","Blank journal and tea on a cafe table by a window","journal, tea, cafe, window, morning, writing, calm","Lifestyle"],
+["organised-wardrobe","An organised open wardrobe with neatly folded neutral clothes and empty hangers","Organised wardrobe with folded neutral clothes","wardrobe, organised, folded clothes, declutter, minimal, closet","Buildings and Architecture"],
+["meal-prep-containers","Neat rows of meal prep containers with colourful vegetables and grains on a kitchen counter","Meal prep containers with vegetables and grains in a row","meal prep, containers, vegetables, healthy, kitchen, organisation, food prep","Food"],
+["meditation-corner","A calm meditation corner with a cushion, a candle and a small plant near a window","Calm meditation corner with a cushion and candle","meditation, cushion, candle, mindfulness, calm, corner, wellness","Lifestyle"],
+["blank-habit-tracker-desk","A desk with a blank paper tracker sheet, a pen and a small desk clock, no readable marks","Desk with a blank tracker sheet pen and desk clock","blank sheet, desk, pen, clock, tracking, habits, planning","Work"],
+["fresh-desk-reset","A completely clear empty desk with only a closed laptop and a small plant, bright and clean","Completely clear desk with a laptop and a small plant","clear desk, laptop, plant, clean, minimal, reset, workspace","Work"],
+["smoothie-ingredients","Fresh smoothie ingredients, spinach, banana, berries and almond milk on a kitchen board","Fresh smoothie ingredients on a kitchen board","smoothie, ingredients, spinach, banana, berries, healthy, kitchen","Food"],
+["morning-stretch-mat","An exercise mat with a foam roller and a water bottle in a bright living room","Exercise mat and foam roller in a bright living room","exercise mat, foam roller, living room, stretching, home fitness, bright","Sports"],
+["blank-calendar-wall","A large blank wall calendar with empty grid squares hanging above a tidy desk","Large blank wall calendar above a tidy desk","blank calendar, wall, desk, planning, empty grid, organisation","Work"],
+["desk-plants-reset","A refreshed desk with three small potted plants, a blank notebook and soft daylight","Refreshed desk with potted plants and a blank notebook","desk, plants, blank notebook, daylight, refreshed, green, workspace","Work"]],
+valentines:[
+["red-roses-bouquet","A lush bouquet of deep red roses with scattered petals on a dark background","Lush bouquet of deep red roses with scattered petals on a dark background","red roses, bouquet, petals, dark background, flowers, gift","Holidays"],
+["heart-bokeh","Soft glowing heart shaped bokeh lights in pink and red tones on a dark background","Glowing heart shaped bokeh lights in pink and red","heart bokeh, lights, pink, red, glow, background, romantic","Backgrounds"],
+["gift-boxes-ribbons","Elegant gift boxes with satin ribbons and bows in red and blush pink on a soft background","Gift boxes with satin ribbons in red and blush pink","gift boxes, ribbons, bows, red, pink, presents, wrapping","Holidays"],
+["chocolate-box","An open box of assorted chocolates with rose petals beside it on a dark table","Open box of assorted chocolates with rose petals","chocolates, box, assorted, rose petals, sweets, gift","Food"],
+["romantic-dinner-table","A romantic dinner table setting for two with candles, wine glasses and rose petals, no people","Romantic dinner table for two with candles and rose petals","dinner table, candles, wine glasses, rose petals, table setting, evening","Holidays"],
+["love-letter-flatlay","A flat lay of blank cards, envelopes, a wax seal stamp and dried roses on linen","Flat lay of blank cards envelopes and dried roses","blank cards, envelopes, wax seal, dried roses, flat lay, letters","Holidays"],
+["pink-silk-abstract","Flowing pink and red silk fabric waves as an elegant abstract background","Flowing pink and red silk fabric abstract background","silk, fabric, pink, red, waves, abstract, background, elegant","Graphic Resources"],
+["rose-petals-candles","Scattered rose petals around glowing candles on a dark reflective surface","Rose petals around glowing candles on a dark surface","rose petals, candles, glow, dark, spa, romantic, reflection","Holidays"],
+["heart-balloons","Red and pink heart shaped balloons floating against a soft pastel sky background","Heart shaped balloons against a pastel sky","heart balloons, red, pink, pastel, sky, floating, celebration","Holidays"],
+["rose-heart-arrangement","Red roses arranged in a heart shape on a dark stone background seen from above","Red roses arranged in a heart shape from above","roses, heart shape, arrangement, top view, dark background, flowers","Holidays"],
+["valentine-cupcakes","Pink frosted cupcakes with heart sprinkles on a cake stand","Pink frosted cupcakes with heart sprinkles on a cake stand","cupcakes, pink frosting, heart sprinkles, baking, sweets, cake stand","Food"],
+["perfume-roses","A perfume bottle among red rose petals and soft pink light","Perfume bottle among red rose petals in soft light","perfume bottle, rose petals, pink light, beauty, gift, fragrance","Holidays"]],
+tax:[
+["tax-desk-calculator","A desk with a calculator with a blank display, blank tax forms, a pen and a laptop","Desk with a calculator blank forms and a laptop","calculator, blank forms, desk, laptop, pen, paperwork, office","Business"],
+["laptop-growth-chart","A laptop on a desk with an abstract rising bar chart shape made of light, no readable numbers","Laptop with an abstract rising chart of light","laptop, chart, growth, abstract, light, business, desk","Business"],
+["piggy-bank-coins","A pink piggy bank with plain blank coins scattered beside it on a light background","Piggy bank with plain blank coins on a light background","piggy bank, coins, savings, pink, money, light background","Business"],
+["savings-jars","Glass savings jars with plain coins and blank labels on a wooden shelf","Glass savings jars with coins and blank labels","jars, savings, coins, blank labels, shelf, money, budgeting","Business"],
+["file-folders-blank","A row of file folders with completely blank tabs in a desk organiser","File folders with blank tabs in a desk organiser","file folders, blank tabs, organiser, office, paperwork, filing","Business"],
+["paperwork-binders","Neat stacks of paperwork and ring binders on an office desk","Stacks of paperwork and ring binders on an office desk","paperwork, binders, stacks, office desk, documents, organised","Business"],
+["coins-plant-growth","A small green plant growing from a pile of plain coins in a glass jar","Plant growing from plain coins in a glass jar","plant, coins, jar, growth, investment, savings, green","Business"],
+["accounting-flatlay","An accounting flat lay with a calculator with a blank display, blank ledger book, pen and glasses","Accounting flat lay with a calculator and blank ledger","flat lay, calculator, ledger, pen, glasses, accounting, desk","Business"],
+["budget-planning-desk","A budget planning desk with a blank notebook, calculator with a blank display and envelopes","Budget planning desk with a blank notebook and calculator","budget, blank notebook, calculator, envelopes, planning, desk","Business"],
+["organised-paperwork","Perfectly organised paperwork in trays and folders on a clean desk","Organised paperwork in trays on a clean desk","paperwork, trays, folders, clean desk, organised, office","Business"],
+["receipt-stack-blank","A neat stack of blank receipts and a calculator with a blank display on a wooden desk","Stack of blank receipts with a calculator on a desk","receipts, blank, calculator, wooden desk, expenses, records","Business"],
+["safe-money-box","A small home safe and a lockbox with plain coins beside them on a desk","Home safe and lockbox with plain coins on a desk","safe, lockbox, coins, security, money, desk, savings","Business"]],
+winter:[
+["snowy-landscape","A serene snowy landscape with pine trees and soft falling snow at dusk","Serene snowy landscape with pine trees at dusk","snow, landscape, pine trees, dusk, serene, cold, nature","Landscapes"],
+["frosted-window-warm","A frosted window with warm golden light glowing through from inside","Frosted window with warm golden light inside","frosted window, warm light, glow, frost, evening, home","Buildings and Architecture"],
+["cozy-interior-hotdrink","A cozy interior corner with a blanket, an armchair and a steaming mug on a side table","Cozy interior with a blanket armchair and a steaming mug","cozy, blanket, armchair, mug, interior, warm, hygge","Buildings and Architecture"],
+["winter-forest","A quiet winter forest with snow covered trees and soft fog","Quiet winter forest with snow covered trees and fog","forest, snow, trees, fog, quiet, nature, cold","Landscapes"],
+["snowy-village-dusk","A snowy village street at dusk with cottages, warm glowing windows and lanterns","Snowy village street at dusk with warm glowing windows","village, snow, dusk, cottages, lanterns, warm windows, street","Travel"],
+["fireplace-corner","A lit fireplace with stockings, a rug and an armchair in a warm room, no people","Lit fireplace with an armchair in a warm room","fireplace, warm, armchair, rug, fire, cozy room","Buildings and Architecture"],
+["hot-chocolate-mug","A mug of hot chocolate with marshmallows beside a knitted blanket and a book with a blank cover","Hot chocolate with marshmallows beside a knitted blanket","hot chocolate, marshmallows, mug, knitted blanket, book, cozy","Food"],
+["snowy-mountain-cabin","A wooden cabin in snowy mountains with smoke rising from the chimney at dawn","Wooden cabin in snowy mountains at dawn","cabin, mountains, snow, dawn, smoke, wooden, remote","Landscapes"],
+["winter-window-breakfast","A breakfast table by a window looking out on falling snow","Breakfast table by a window with falling snow outside","breakfast, window, snow, table, morning, view, cozy","Buildings and Architecture"],
+["frozen-lake","A frozen lake with frost patterns and distant snowy hills under a pale sky","Frozen lake with frost patterns and snowy hills","frozen lake, ice, frost, hills, pale sky, nature, cold","Landscapes"],
+["knitwear-flatlay","A flat lay of knitted sweaters, a scarf and gloves in warm neutral tones","Flat lay of knitted sweaters scarf and gloves","knitwear, sweaters, scarf, gloves, flat lay, warm, clothing","Lifestyle"],
+["snowy-park-bench","A park bench covered in snow under frosted trees in soft morning light","Snow covered park bench under frosted trees","park bench, snow, frosted trees, morning light, park, quiet","Landscapes"]],
+ramadan:[
+["ramadan-lanterns","Ornate Ramadan lanterns glowing warmly on a table at dusk with dates and tea","Ornate Ramadan lanterns glowing at dusk with dates and tea","lanterns, glowing, dusk, dates, tea, table, festive","Culture and Religion"],
+["crescent-mosque-dusk","A mosque silhouette with a crescent moon in a deep blue dusk sky","Mosque silhouette with a crescent moon at dusk","mosque, silhouette, crescent moon, dusk, sky, architecture","Culture and Religion"],
+["iftar-table","An iftar table with dates, water, soup bowls, bread and lanterns, no people","Iftar table with dates soup bread and lanterns","iftar, table, dates, soup, bread, lanterns, food spread","Culture and Religion"],
+["islamic-pattern","An elegant Islamic geometric pattern in gold and deep teal as a background","Islamic geometric pattern in gold and teal background","geometric pattern, gold, teal, background, ornament, design","Graphic Resources"],
+["prayer-beads-book","Prayer beads beside a closed book with a plain cover on an embroidered cloth","Prayer beads beside a plain covered book on embroidered cloth","prayer beads, book, embroidered cloth, still life, devotion","Culture and Religion"],
+["dates-ramadan-bowl","A decorative bowl of dates with mint tea and lanterns in warm light","Bowl of dates with mint tea and lanterns in warm light","dates, bowl, mint tea, lanterns, warm light, food","Culture and Religion"],
+["mosque-courtyard-lanterns","Lanterns hanging in a mosque courtyard at twilight, no people","Lanterns in a mosque courtyard at twilight","lanterns, courtyard, twilight, architecture, hanging lights","Culture and Religion"],
+["eid-gift-boxes","Eid gift boxes with gold ribbons and crescent decorations on a table","Eid gift boxes with gold ribbons and crescent decorations","gift boxes, gold ribbons, crescent, eid, presents, table","Culture and Religion"],
+["ramadan-sweets","A tray of Ramadan sweets and pastries with tea glasses on a patterned cloth","Tray of Ramadan sweets with tea on a patterned cloth","sweets, pastries, tea, tray, patterned cloth, desserts","Food"],
+["crescent-lantern-night","A single glowing lantern under a crescent moon on a calm night background","Glowing lantern under a crescent moon at night","lantern, crescent moon, night, glow, calm, background","Culture and Religion"]],
+spring:[
+["pastel-tulips","Pastel tulips and cherry blossom branches in a vase by a bright window","Pastel tulips and blossom branches in a vase by a window","tulips, pastel, blossom, vase, window, flowers, bright","Plants and Flowers"],
+["easter-eggs-nest","Painted Easter eggs in a nest with spring flowers on a rustic table","Painted Easter eggs in a nest with spring flowers","easter eggs, nest, painted, spring flowers, rustic table","Holidays"],
+["spring-garden","A spring garden awakening with fresh green shoots and early flowers","Spring garden with fresh green shoots and early flowers","garden, green shoots, flowers, awakening, nature, fresh","Nature"],
+["cherry-blossom-sky","Cherry blossom branches against a clear blue spring sky","Cherry blossom branches against a blue spring sky","cherry blossom, branches, blue sky, petals, trees","Nature"],
+["green-leaves-dew","Fresh green leaves with morning dew drops in soft sunlight","Fresh green leaves with dew drops in sunlight","green leaves, dew drops, sunlight, fresh, nature, macro","Nature"],
+["spring-picnic","A spring picnic blanket with a basket, lemonade and flowers on green grass, no people","Spring picnic blanket with a basket on green grass","picnic, blanket, basket, lemonade, grass, outdoors","Lifestyle"],
+["seedlings-tray","A tray of young seedlings in small pots on a sunny windowsill","Tray of seedlings in small pots on a sunny windowsill","seedlings, pots, windowsill, gardening, growing, sunlight","Nature"],
+["daffodils-field","A field of yellow daffodils under a bright spring sky","Field of yellow daffodils under a bright sky","daffodils, field, yellow, flowers, sky, meadow","Nature"],
+["spring-rain-window","Raindrops on a window with blurred green spring foliage behind","Raindrops on a window with green spring foliage","raindrops, window, green, foliage, blurred, fresh","Nature"],
+["butterfly-garden","A butterfly resting on spring flowers in a sunny garden","Butterfly on spring flowers in a sunny garden","butterfly, flowers, garden, sunny, wings, nature","Animals"],
+["easter-table-setting","An Easter table setting with pastel eggs, tulips and linen napkins","Easter table setting with pastel eggs and tulips","easter, table setting, pastel eggs, tulips, linen, brunch","Holidays"],
+["spring-cleaning-supplies","Natural spring cleaning supplies, brushes and cloths in a basket by a window","Natural cleaning supplies in a basket by a window","cleaning supplies, brushes, basket, natural, window, fresh home","Lifestyle"]],
+mothersday:[
+["peonies-bouquet","A bouquet of pink peonies and roses in a glass vase on a light table","Bouquet of pink peonies and roses in a glass vase","peonies, roses, bouquet, pink, vase, flowers","Holidays"],
+["breakfast-tray-bed","A breakfast tray with croissants, fruit and flowers on white bedding, no people","Breakfast tray with croissants and flowers on white bedding","breakfast tray, croissants, fruit, flowers, bedding, morning","Holidays"],
+["blank-card-flowers","A blank greeting card surrounded by spring flowers on a pastel background","Blank greeting card surrounded by spring flowers","blank card, spring flowers, pastel, greeting, copy space","Holidays"],
+["spa-gift-set","A spa gift set with towels, candles and bath products in soft pastel tones","Spa gift set with towels candles and bath products","spa, gift set, towels, candles, bath, pastel, pamper","Holidays"],
+["tea-set-garden","A porcelain tea set with a teapot and cups on a garden table with flowers","Porcelain tea set on a garden table with flowers","tea set, porcelain, teapot, cups, garden table, flowers","Holidays"],
+["flower-box-gift","A gift box of mixed pastel flowers with a blank tag","Gift box of pastel flowers with a blank tag","flower box, pastel, gift, blank tag, mixed flowers","Holidays"],
+["baking-together-ingredients","Baking ingredients and a mixing bowl with flowers beside them on a kitchen counter","Baking ingredients and a bowl on a kitchen counter","baking, ingredients, mixing bowl, kitchen, flowers, homemade","Food"],
+["rose-garden-bench","A garden bench surrounded by blooming roses in soft light","Garden bench surrounded by blooming roses","bench, roses, garden, blooming, soft light","Nature"]],
+summer:[
+["beach-aerial","An aerial view of a turquoise beach with umbrellas and gentle waves","Aerial view of a turquoise beach with umbrellas","beach, aerial, turquoise, umbrellas, waves, shore","Travel"],
+["suitcase-travel-flatlay","A travel flat lay with an open suitcase, sunglasses, a camera and a straw hat","Travel flat lay with a suitcase sunglasses and a camera","suitcase, flat lay, sunglasses, camera, straw hat, packing","Travel"],
+["tropical-leaves","Lush tropical leaves in sunlight as a fresh summer background","Tropical leaves in sunlight summer background","tropical leaves, green, sunlight, background, lush","Nature"],
+["ice-cream-cones","Colourful ice cream cones on a pastel background in bright sunlight","Colourful ice cream cones on a pastel background","ice cream, cones, colourful, pastel, sunlight, dessert","Food"],
+["pool-float","A swimming pool with a colourful float and palm shadows on the water","Swimming pool with a float and palm shadows","pool, float, palm shadows, water, blue, resort","Travel"],
+["lemonade-stand-drinks","Glasses of lemonade with mint and citrus on a sunny outdoor table","Glasses of lemonade with mint on a sunny table","lemonade, glasses, mint, citrus, sunny, drinks","Food"],
+["mountain-lake-cabin","A cabin by a mountain lake in summer with wildflowers on the shore","Cabin by a mountain lake with wildflowers","cabin, mountain lake, wildflowers, shore, nature","Travel"],
+["sunflower-field","A sunflower field under a bright blue summer sky","Sunflower field under a bright blue sky","sunflowers, field, blue sky, yellow, meadow","Nature"],
+["bbq-grill-outdoor","An outdoor barbecue grill with vegetables and corn in a garden setting","Barbecue grill with vegetables in a garden","barbecue, grill, vegetables, corn, garden, outdoor cooking","Food"],
+["coastal-town-view","A coastal town view with white houses and a blue harbour in summer","Coastal town with white houses and a blue harbour","coastal town, white houses, harbour, blue, seaside","Travel"],
+["watermelon-picnic","Sliced watermelon and summer fruit on a picnic blanket in a park","Watermelon and summer fruit on a picnic blanket","watermelon, fruit, picnic blanket, park, fresh","Food"],
+["sailboats-harbour","Small sailboats on calm water in a summer harbour at golden hour","Sailboats on calm water at golden hour","sailboats, harbour, calm water, golden hour, boats","Travel"]],
+backtoschool:[
+["school-supplies-flatlay","A flat lay of school supplies, pencils, notebooks with blank covers and a ruler on a desk","Flat lay of school supplies on a desk","school supplies, pencils, notebooks, ruler, flat lay, desk","Education"],
+["backpack-desk","A school backpack beside a desk with blank notebooks and an apple","School backpack beside a desk with notebooks and an apple","backpack, desk, notebooks, apple, classroom, supplies","Education"],
+["classroom-empty","An empty bright classroom with desks, chairs and a blank board","Empty bright classroom with a blank board","classroom, desks, blank board, empty, bright, school","Education"],
+["study-desk-lamp","A study desk with a lamp, blank notebook, pencils and a small plant","Study desk with a lamp and a blank notebook","study desk, lamp, blank notebook, pencils, plant, homework","Education"],
+["books-stack-apple","A stack of books with an apple on top beside reading glasses","Stack of books with an apple and reading glasses","books, stack, apple, glasses, reading, study","Education"],
+["art-supplies-kids","Children's art supplies, coloured pencils, paints and blank paper on a table","Art supplies with coloured pencils and blank paper","art supplies, coloured pencils, paints, blank paper, crafts","Education"],
+["lunchbox-healthy","A healthy school lunchbox with sandwiches, fruit and vegetables","Healthy school lunchbox with sandwiches and fruit","lunchbox, sandwiches, fruit, vegetables, healthy, school lunch","Food"],
+["library-shelves","Tall library shelves full of books in warm light","Library shelves full of books in warm light","library, shelves, books, warm light, reading","Education"],
+["globe-desk","A globe on a classroom desk with blank notebooks","Globe on a classroom desk with notebooks","globe, classroom desk, notebooks, geography, learning","Education"],
+["online-learning-laptop","A laptop with a blank screen on a study desk with headphones and notebooks","Laptop with a blank screen on a study desk","laptop, blank screen, headphones, study desk, online learning","Education"]],
+autumn:[
+["pumpkin-arrangement","An arrangement of pumpkins and autumn leaves on a rustic wooden table","Pumpkins and autumn leaves on a rustic table","pumpkins, autumn leaves, rustic table, harvest, orange","Holidays"],
+["autumn-forest-path","A forest path covered in golden autumn leaves in soft light","Forest path covered in golden autumn leaves","forest path, golden leaves, trees, soft light, fall","Nature"],
+["halloween-pumpkins-night","Carved Halloween pumpkins glowing at night on a porch, no people","Carved Halloween pumpkins glowing on a porch at night","halloween, pumpkins, glowing, porch, night, carved","Holidays"],
+["cozy-autumn-reading","A reading corner with a blanket, a mug and books beside a window with autumn view","Reading corner with a blanket and mug by an autumn window","reading corner, blanket, mug, books, window, cozy","Lifestyle"],
+["apple-harvest","Crates of freshly picked apples in an orchard in autumn light","Crates of apples in an orchard in autumn light","apples, crates, orchard, harvest, autumn light","Nature"],
+["autumn-wreath-door","An autumn wreath with leaves and berries hanging on a wooden door","Autumn wreath with leaves and berries on a wooden door","wreath, leaves, berries, wooden door, decoration","Holidays"],
+["spiced-latte","A spiced latte with cinnamon sticks and autumn leaves on a wooden table","Spiced latte with cinnamon on a wooden table","latte, cinnamon, wooden table, coffee, warm drink","Food"],
+["misty-autumn-lake","A misty autumn lake with orange trees on the shore at dawn","Misty autumn lake with orange trees at dawn","lake, mist, orange trees, dawn, shore, calm","Landscapes"],
+["fall-baking-pie","A freshly baked pie with autumn spices and leaves on a kitchen table","Freshly baked pie on a kitchen table","pie, baking, kitchen table, spices, homemade","Food"],
+["autumn-leaves-background","A background of rich red orange and gold autumn leaves","Background of red orange and gold autumn leaves","autumn leaves, red, orange, gold, background, texture","Backgrounds"]],
+christmas:[
+["christmas-tree-lights","A decorated Christmas tree with warm lights and ornaments in a cozy room","Decorated Christmas tree with warm lights in a cozy room","christmas tree, lights, ornaments, cozy room, decorated","Holidays"],
+["christmas-gift-wrapping","Christmas gift wrapping with boxes, ribbons, pine branches and ornaments on a table","Christmas gift wrapping with ribbons and pine branches","gift wrapping, boxes, ribbons, pine, ornaments, table","Holidays"],
+["christmas-cookies","Christmas cookies with icing on a plate beside a mug of cocoa","Christmas cookies on a plate beside a mug of cocoa","cookies, icing, plate, cocoa, baking, festive","Food"],
+["christmas-fireplace","A fireplace with stockings, garland and a Christmas tree beside it","Fireplace with stockings garland and a Christmas tree","fireplace, stockings, garland, tree, warm, decorated","Holidays"],
+["snowy-christmas-market","A snowy Christmas market street with stalls and warm lights at dusk, no people","Snowy Christmas market street with warm lights at dusk","christmas market, snow, stalls, lights, dusk, street","Holidays"],
+["christmas-ornaments-macro","A macro shot of red and gold Christmas ornaments with bokeh lights","Red and gold Christmas ornaments with bokeh lights","ornaments, red, gold, macro, bokeh, baubles","Holidays"],
+["christmas-table-setting","A Christmas dinner table setting with candles, pine and red napkins, no people","Christmas dinner table setting with candles and pine","table setting, candles, pine, red napkins, dinner","Holidays"],
+["gingerbread-house","A gingerbread house with icing and candy decorations on a snowy base","Gingerbread house with icing and candy decorations","gingerbread house, icing, candy, baking, festive","Food"],
+["christmas-wreath-door","A Christmas wreath with pine cones and a red bow on a door","Christmas wreath with pine cones and a red bow","wreath, pine cones, red bow, door, decoration","Holidays"],
+["hot-cocoa-christmas","A mug of hot cocoa with marshmallows beside Christmas lights and a blanket","Hot cocoa with marshmallows beside Christmas lights","hot cocoa, marshmallows, mug, lights, blanket, cozy","Food"],
+["christmas-flatlay-blank-card","A Christmas flat lay with a blank card, pine branches, ornaments and ribbon","Christmas flat lay with a blank card and pine branches","flat lay, blank card, pine, ornaments, ribbon, copy space","Holidays"],
+["winter-christmas-village","A miniature Christmas village with tiny houses and warm lights under snow","Miniature Christmas village with warm lights under snow","village, miniature, houses, lights, snow, scene","Holidays"]]
+};
+
+/* ================= APP LOGIC ================= */
+const $ = id => document.getElementById(id);
+const logEl = $("log");
+function log(msg){ const t = new Date().toLocaleTimeString(); logEl.textContent += "\n[" + t + "] " + msg; logEl.scrollTop = logEl.scrollHeight; }
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* API key persistence */
+const keyInput = $("apikey");
+keyInput.value = localStorage.getItem("ss_api_key") || "";
+keyInput.addEventListener("change", () => { localStorage.setItem("ss_api_key", keyInput.value.trim()); log("API key saved on this device."); });
+
+/* History + used scenes */
+function getUsed(){ try { return new Set(JSON.parse(localStorage.getItem("ss_used") || "[]")); } catch(e){ return new Set(); } }
+function saveUsed(s){ localStorage.setItem("ss_used", JSON.stringify([...s])); }
+function getHist(){ try { return JSON.parse(localStorage.getItem("ss_hist") || "[]"); } catch(e){ return []; } }
+function renderHist(){
+  const h = getHist();
+  $("hist").innerHTML = h.length ? h.slice(-12).reverse().map(x => "• " + x.date + " — " + x.count + " images — " + x.themes).join("<br>") : "None yet.";
+}
+$("clearhist").addEventListener("click", () => { localStorage.removeItem("ss_hist"); localStorage.removeItem("ss_used"); renderHist(); log("History cleared."); });
+renderHist();
+
+/* Plan */
+const overrideSel = $("override");
+Object.keys(BANKS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = THEME_NAMES[k]; overrideSel.appendChild(o); });
+function currentThemes(){
+  const ov = overrideSel.value;
+  if (ov) return [ov];
+  return MONTH_THEMES[new Date().getMonth() + 1] || ["freshstart"];
+}
+function planText(){
+  const n = parseInt($("count").value, 10);
+  const th = currentThemes();
+  const per = Math.floor(n / th.length), extra = n % th.length;
+  const parts = th.map((t, i) => "<b>" + THEME_NAMES[t] + "</b> × " + (per + (i < extra ? 1 : 0)));
+  $("autoplan").innerHTML = "Today: " + new Date().toLocaleDateString(undefined, {day:"numeric", month:"long", year:"numeric"}) + "<br>Season plan: " + parts.join(" · ") + " = " + n + " images";
+}
+$("count").addEventListener("change", planText);
+overrideSel.addEventListener("change", planText);
+planText();
+
+function buildPlan(){
+  const n = parseInt($("count").value, 10);
+  const th = currentThemes();
+  const used = getUsed();
+  const items = [];
+  const per = Math.floor(n / th.length), extra = n % th.length;
+  th.forEach((theme, ti) => {
+    const want = per + (ti < extra ? 1 : 0);
+    const bank = BANKS[theme];
+    let made = 0, guard = 0;
+    while (made < want && guard < want * 12){
+      guard++;
+      const scene = bank[(guard - 1) % bank.length];
+      const v = Math.floor((guard - 1) / bank.length) % VARIANTS.length;
+      const key = theme + ":" + scene[0] + ":" + v;
+      if (used.has(key) && guard < want * 8) continue;
+      items.push({theme, slug: scene[0], scene: scene[1], title: scene[2], kw: scene[3], cat: scene[4], variant: v, key});
+      made++;
+    }
+  });
+  items.forEach((it, i) => { it.file = String(i + 1).padStart(2, "0") + "-" + it.slug + (it.variant ? "-v" + (it.variant + 1) : "") + ".jpg"; });
+  return items;
+}
+function csvCell(s){ s = String(s == null ? "" : s); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function buildCSV(items){
+  const rows = [["Filename","Title","Keywords","Category","Releases"]];
+  items.forEach(it => rows.push([it.file, it.title, it.kw + ", " + THEME_KW[it.theme], it.cat, ""]));
+  return rows.map(r => r.map(csvCell).join(",")).join("\r\n");
+}
+
+/* Generation */
+let running = false, stopFlag = false, doneItems = [];
+async function genOne(it, apiKey){
+  const prompt = it.scene + (VARIANTS[it.variant] || "") + STYLE;
+  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "16:9" } } };
+  let lastErr = "";
+  for (let attempt = 0; attempt < 3; attempt++){
+    try {
+      const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }, body: JSON.stringify(body) });
+      if (res.status === 429){ lastErr = "rate limit (429)"; log("Google free limit hit — waiting 60s, then retrying…"); await sleep(60000); continue; }
+      if (res.status >= 500){ lastErr = "server " + res.status; await sleep(10000); continue; }
+      if (!res.ok){ const t = await res.text(); throw new Error("HTTP " + res.status + " " + t.slice(0, 160)); }
+      const data = await res.json();
+      const parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+      const img = parts.find(p => p.inlineData && p.inlineData.data);
+      if (!img) throw new Error("No image in response (possibly filtered).");
+      return img.inlineData.data;
+    } catch(e){ lastErr = e.message || String(e); if (attempt === 2) throw new Error(lastErr); await sleep(4000); }
+  }
+  throw new Error(lastErr || "failed");
+}
+function addThumb(it, b64){
+  const fig = document.createElement("figure");
+  const img = document.createElement("img"); img.src = "data:image/jpeg;base64," + b64; img.alt = it.file;
+  const cap = document.createElement("figcaption"); cap.textContent = it.file;
+  fig.appendChild(img); fig.appendChild(cap); $("grid").appendChild(fig);
+}
+$("stop").addEventListener("click", () => { stopFlag = true; log("Stop requested — finishing the current image, then stopping."); });
+$("go").addEventListener("click", async () => {
+  const apiKey = keyInput.value.trim();
+  if (!apiKey){ alert("Pehle API key daalein (box 1)."); keyInput.focus(); return; }
+  if (running) return;
+  running = true; stopFlag = false; doneItems = [];
+  $("go").disabled = true; $("stop").disabled = false; $("zip").disabled = true; $("copycsv").disabled = true;
+  $("grid").innerHTML = ""; $("bar").style.display = "block"; $("bar").value = 0;
+  const items = buildPlan();
+  log("Batch started: " + items.length + " images — " + currentThemes().map(t => THEME_NAMES[t]).join(", ") + ".");
+  let ok = 0, fail = 0;
+  for (let i = 0; i < items.length; i++){
+    if (stopFlag){ log("Stopped by you. " + ok + " images are ready to download."); break; }
+    const it = items[i];
+    $("status").innerHTML = "Making " + (i + 1) + " / " + items.length + " — " + it.file + " <span class='st-run'>…</span>";
+    try {
+      const b64 = await genOne(it, apiKey);
+      it.b64 = b64; doneItems.push(it); addThumb(it, b64); ok++;
+      const used = getUsed(); used.add(it.key); saveUsed(used);
+    } catch(e){ fail++; log("FAILED " + it.file + " — " + e.message); }
+    $("bar").value = Math.round(((i + 1) / items.length) * 100);
+    if (i < items.length - 1) await sleep(2500);
+  }
+  $("status").innerHTML = "Done: <span class='st-ok'>" + ok + " images ready</span>" + (fail ? " · <span class='st-bad'>" + fail + " failed</span>" : "") + (stopFlag ? " · stopped early" : "");
+  log("Batch finished: " + ok + " ok, " + fail + " failed.");
+  if (doneItems.length){
+    $("zip").disabled = false; $("copycsv").disabled = false;
+    const h = getHist(); h.push({ date: new Date().toISOString().slice(0, 10), count: doneItems.length, themes: [...new Set(doneItems.map(x => THEME_NAMES[x.theme]))].join(", ") });
+    localStorage.setItem("ss_hist", JSON.stringify(h)); renderHist();
+  }
+  running = false; $("go").disabled = false; $("stop").disabled = true;
+});
+$("copycsv").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(buildCSV(doneItems)); log("CSV copied — paste it to Muse in chat."); }
+  catch(e){ log("Copy failed: " + e.message); }
+});
+$("zip").addEventListener("click", async () => {
+  if (!doneItems.length) return;
+  $("zip").disabled = true; $("zip").textContent = "Packing…";
+  try {
+    const zip = new JSZip();
+    doneItems.forEach(it => zip.file(it.file, it.b64, { base64: true }));
+    zip.file("adobe-metadata.csv", buildCSV(doneItems));
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "adobe-stock-batch-" + new Date().toISOString().slice(0, 10) + ".zip";
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    log("ZIP downloaded: " + doneItems.length + " images + adobe-metadata.csv. Send this ZIP to Muse.");
+  } catch(e){ log("ZIP failed: " + e.message); }
+  $("zip").disabled = false; $("zip").textContent = "⬇ Download ZIP (images + CSV)";
+});
+if ("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(() => {}); }
+</script>
+</body>
+</html>
